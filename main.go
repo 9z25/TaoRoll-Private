@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"./taonode"
 )
 
 type GameState int32
@@ -52,14 +53,29 @@ type Bet struct {
 	Id    *websocket.Conn
 	Bet   string
 	Wager int
+	Address string
 	Balance int
 }
 
 type Dice struct {
-	L int `json:"l,omitempty"`
-	R int `json:"r,omitempty"`
+	L     int `json:"l,omitempty"`
+	R     int `json:"r,omitempty"`
 	Total int `json:"total,omitempty"`
 }
+
+type LastTx struct {
+	Type      string `json:"type"`
+	Addresses string `json:"addresses"`
+}
+type TaoExplorer struct {
+	Address  string   `json:"address"`
+	Sent     int      `json:"sent"`
+	Received string   `json:"received"`
+	Balance  string   `json:"balance"`
+	lastTxs  []LastTx `json:"last_txs"`
+}
+
+
 
 var Man map[string]Bet
 var Game Round
@@ -187,9 +203,26 @@ func reader(conn *websocket.Conn) {
 		_, ok = Man[d.UUID]
 		if !ok {
 
-			Man[d.UUID] = Bet{Name: d.Message, Id: conn, Balance: 100}
-					//User entered chatroom
+			var data TaoExplorer
+			nodeAddr := taonode.GetAddress()
+			
+			res := taonode.Balance(nodeAddr)
+			
+			if err := json.Unmarshal([]byte(res), &data); err != nil {
+				fmt.Println(err)
+				return
+			}
 
+			bal, err := strconv.Atoi(data.Balance)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			Man[d.UUID] = Bet{Name: d.Message, Id: conn, Address: nodeAddr, Balance: bal, }
+			fmt.Println(Man[d.UUID])
+					
+			
+			//User entered chatroom
 
 			Arr = append(Arr, d.Message)
 			Game.Users = Arr
@@ -201,10 +234,6 @@ func reader(conn *websocket.Conn) {
 			shooter = Clients[0]
 			Game.GameData.Shooter = Man[Clients[0]].Name
 			d.GameData.Shooter = Man[Clients[0]].Name
-			fmt.Println("!@#$",Arr)
-					fmt.Println("!@#$",Game.Users)
-					fmt.Println("!@#$",Man)
-					fmt.Println("!@#$",Clients)
 
 			if rows < 2 {
 				for _, element := range Arr {
@@ -314,7 +343,6 @@ func reader(conn *websocket.Conn) {
 				Game.State = GState
 				d.State = GState
 				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
-				fmt.Println("Shhoootterrr:", shooter)
 
 			}
 			if t == 7 && GState == ON {
@@ -326,7 +354,6 @@ func reader(conn *websocket.Conn) {
 				Game.State = GState
 				d.State = GState
 				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
-				fmt.Println("Shhoootterrr:", shooter)
 
 
 			}
@@ -363,9 +390,7 @@ func reader(conn *websocket.Conn) {
 				Game.State = GState
 				d.State = GState
 				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
-				fmt.Println("Shhoootterrr:", shooter)
 				
-
 			} 
 			if t == 2 && GState == COMEOUT || GState == COMEOUT && t == 3 || GState == COMEOUT && t == 12 {
 
@@ -377,20 +402,12 @@ func reader(conn *websocket.Conn) {
 
 				GState = CRAPS
 				Game.State = GState
-
-				//d.Jumbotron = "Wait for others to match.."
 				
 				d.GameData.PlaceBet = true
 				d.State = GState
 				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
 				fmt.Println("Shhoootterrr:", shooter)
 			}
-		
-		
-	
-
-
-
 
 
 
@@ -400,7 +417,6 @@ func reader(conn *websocket.Conn) {
 
 		case COMEOUT:
 			Game.Jumbotron = "Comeout roll"
-			//d.Jumbotron = "Wait for others to match..."
 
 		case CRAPS:
 
@@ -480,7 +496,7 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
-	log.Println("Client Successfully Connected...")
+	//log.Println("Client Successfully Connected...")
 
 	reader(ws)
 
@@ -495,8 +511,6 @@ func payout(M map[string]Bet, Game Round, d Round, finishState GameState, Client
 
 
 	for _, v := range M {
-		fmt.Println(v.Bet)
-		fmt.Println(finishState)
 		if v.Bet == "PASS" && finishState == PASSWIN || v.Bet == "DONTPASS" && finishState == PASSLOSE || v.Bet == "DONTPASS" && finishState == CRAPS {
 				i++
 			}
@@ -508,7 +522,6 @@ func payout(M map[string]Bet, Game Round, d Round, finishState GameState, Client
 				
 				v.Balance += Game.GameData.Pot / i
 				Man[index] = v
-				fmt.Println("WINNER:", v.Name)
 				if index == shooter {
 					y++
 				}
@@ -578,9 +591,6 @@ func countBets(M map[string]Bet) bool {
 
 func placeBet(M map[string]Bet, U []string, d Round) (map[string]Bet, []string, Round) {
 
-	fmt.Println("asfdadfsj[piojopijporgjopsijrpojporgj[][][][][]")
-	fmt.Println(d.Wager)
-	fmt.Println(Man[shooter].Wager)
 	for index, v := range M {
 
 		if index == d.UUID {
@@ -609,7 +619,7 @@ func placeBet(M map[string]Bet, U []string, d Round) (map[string]Bet, []string, 
 func setupRoutes() {
 	http.HandleFunc("/", homePage)
 	http.HandleFunc("/ws", wsEndpoint)
-fmt.Println("Go Websockets!")
+    fmt.Println("Go Websockets!")
 }
 
 //redirect all HTTP traffic to HTTPS server on port :443
