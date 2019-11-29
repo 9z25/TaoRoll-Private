@@ -90,7 +90,7 @@ type WalletJSON struct {
 }
 
 
-var w WalletJSON
+var wallet WalletJSON
 var Man map[string]Bet
 var Game Round
 
@@ -618,35 +618,33 @@ func placeBet(M map[string]Bet, U []string, d Round) (map[string]Bet, []string, 
 	return M, U, d
 }
 
-func walletEndpoint(w http.ResponseWriter, r *http.Request){
-
-	var conn, _ = upgrader.Upgrade(w, r, nil)
-	go func(conn *websocket.Conn) {
-		for {
-
-			_, p, err := conn.ReadMessage()
-			if err != nil {
-				panic(err)
-			}
-			
-	//mType, msg, _ := conn.ReadMessage()
-	
-
-	if err := json.Unmarshal([]byte(p), &w); err != nil {
+func walletReader(conn *websocket.Conn) {
+for {
+	_, p, err := conn.ReadMessage()
+	if err != nil {
 		panic(err)
 	}
-fmt.Println(w)
 
+	if err := json.Unmarshal([]byte(p), &wallet); err != nil {
+		panic(err)
+	}
 
-
-
-
-
-
-	//conn.WriteMessage(mType, msg)
+	fmt.Println(wallet)
 }
-}(conn)
 
+
+
+func walletEndpoint(w http.ResponseWriter, r *http.Request){
+
+		ws, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println(err)
+		}
+	
+		//log.Println("Client Successfully Connected...")
+	
+		walletReader(ws)
+	
 }
 
 func setupRoutes() {
