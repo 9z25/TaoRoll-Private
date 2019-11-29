@@ -3,14 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gopherjs/gopherjs/js"
-	"github.com/gopherjs/websocket/websocketjs"
-	"honnef.co/go/js/dom"
+	"github.com/gorilla/websocket"
 	"log"
-	"math/rand"
+	"net/http"
 	"strconv"
-	"strings"
-	"time"
+	"./taonode"
 )
 
 type GameState int32
@@ -24,152 +21,16 @@ const (
 	PASSLOSE GameState = 5
 )
 
-type Bet int32
-
-const (
-	PASS     Bet = 0
-	DONTPASS Bet = 1
-)
-
-func addOneDollar(balance int, wager int, p *dom.HTMLButtonElement, dp *dom.HTMLButtonElement, wa *dom.HTMLHeadingElement, ba *dom.HTMLHeadingElement) (int, int) {
-
-	if balance > 0 {
-		balance = balance - 1
-		wager++
-		wa.Set("innerText", wager)
-		
-	}
-
-	if wager > 0 {
-		p.Disabled = false
-		dp.Disabled = false
-	}
-	return balance, wager
-}
-func addFiveDollars(balance int, wager int, p *dom.HTMLButtonElement, dp *dom.HTMLButtonElement, wa *dom.HTMLHeadingElement, ba *dom.HTMLHeadingElement) (int, int) {
-
-	if balance > 4 {
-		balance = balance - 5
-		wager = wager + 5
-		wa.Set("innerText", wager)
-		
-	}
-
-	if wager > 0 {
-		p.Disabled = false
-		dp.Disabled = false
-	}
-
-	return balance, wager
-}
-
-func addTwentyFiveDollars(balance int, wager int, p *dom.HTMLButtonElement, dp *dom.HTMLButtonElement, wa *dom.HTMLHeadingElement, ba *dom.HTMLHeadingElement) (int, int) {
-	if balance > 24 {
-		balance = balance - 25
-		wager = wager + 25
-		wa.Set("innerText", wager)
-		
-	}
-
-	if wager > 0 {
-		p.Disabled = false
-		dp.Disabled = false
-	}
-	return balance, wager
-}
-
-func addOneHundo(balance int, wager int, p *dom.HTMLButtonElement, dp *dom.HTMLButtonElement, wa *dom.HTMLHeadingElement, ba *dom.HTMLHeadingElement) (int, int) {
-	if balance > 99 {
-		balance = balance - 100
-		wager = wager + 100
-		wa.Set("innerText", wager)
-		
-	}
-
-	if wager > 0 {
-		p.Disabled = false
-		dp.Disabled = false
-	}
-	return balance, wager
-}
-
-func playPass(play Bet, state GameState, wager int, b *dom.HTMLButtonElement, oneDollar *dom.HTMLButtonElement, fiveDollar *dom.HTMLButtonElement, twentyFiveDollar *dom.HTMLButtonElement, oneHundo *dom.HTMLButtonElement, result *dom.HTMLHeadingElement, p *dom.HTMLButtonElement, dp *dom.HTMLButtonElement) Bet {
-	play = PASS
-
-
-
-	if wager > 0 && state == COMEOUT {
-
-		oneDollar.Disabled = true
-		fiveDollar.Disabled = true
-		twentyFiveDollar.Disabled = true
-		oneHundo.Disabled = true
-
-		p.Disabled = true
-		dp.Disabled = true
-
-	}
-
-	return play
-}
-
-func playDontPass(play Bet, state GameState, wager int, b *dom.HTMLButtonElement, oneDollar *dom.HTMLButtonElement, fiveDollar *dom.HTMLButtonElement, twentyFiveDollar *dom.HTMLButtonElement, oneHundo *dom.HTMLButtonElement, result *dom.HTMLHeadingElement, p *dom.HTMLButtonElement, dp *dom.HTMLButtonElement) Bet {
-	play = DONTPASS
-	state = COMEOUT
-
-
-	if wager > 0 && state == COMEOUT {
-
-		oneDollar.Disabled = true
-		fiveDollar.Disabled = true
-		twentyFiveDollar.Disabled = true
-		oneHundo.Disabled = true
-
-		p.Disabled = true
-		dp.Disabled = true
-	}
-
-	return play
-}
-
-func loadWager(result *dom.HTMLHeadingElement, w *dom.HTMLButtonElement, p *dom.HTMLButtonElement, dp *dom.HTMLButtonElement, oneDollar *dom.HTMLButtonElement, fiveDollar *dom.HTMLButtonElement, twentyFiveDollar *dom.HTMLButtonElement, oneHundo *dom.HTMLButtonElement, state GameState) GameState {
-
-	state = COMEOUT
-	w.Disabled = true
-
-	if state == COMEOUT {
-		oneDollar.Disabled = false
-		fiveDollar.Disabled = false
-		twentyFiveDollar.Disabled = false
-		oneHundo.Disabled = false
-
-		p.Disabled = true
-		dp.Disabled = true
-	}
-	return state
-}
-
-func roll(i int, f interface{}) (int) {
-
-	if i > 4 {
-		js.Global.Call("clearInterval", f)
-	}
-
-	return i
-}
-
-
-	
-
-
 type Player struct {
 	Username string `json:"username,omitempty"`
 	Bet      string `json:"bet,omitempty"`
+	Id       string `json:"id,omitempty"`
 }
 
 type Players struct {
 	Players  []Player `json:"players,omitempty"`
 	Pot      int      `json:"pot,omitempty"`
+	Balance  int      `json:"balance,omitempty"`
 	Point    int      `json:"point,omitempty"`
 	Shooter  string   `json:"shooter,omitempty"`
 	Roll     bool     `json:"roll,omitempty"`
@@ -187,14 +48,36 @@ type Round struct {
 	Message   string    `json:"message,omitempty"`
 }
 
-type Dice struct {
-	L int `json:"l,omitempty"`
-	R int `json:"r,omitempty"`
+type Bet struct {
+	Name  string
+	Id    *websocket.Conn
+	Bet   string
+	Wager int
+	Address string
+	Balance int
 }
 
-type Data struct {
-	*js.Object
-	Users []string `js:"users,omitempty"`
+type Dice struct {
+	L     int `json:"l,omitempty"`
+	R     int `json:"r,omitempty"`
+	Total int `json:"total,omitempty"`
+}
+
+type LastTx struct {
+	Type      string `json:"type"`
+	Addresses string `json:"addresses"`
+}
+
+type TaoExplorer struct {
+	Address  string   `json:"address"`
+	Sent     int      `json:"sent"`
+	Received string   `json:"received"`
+	Balance  string   `json:"balance"`
+	lastTxs  []LastTx `json:"last_txs"`
+}
+
+type FmTao struct {
+	Result      string `json:"result"`
 }
 
 type WalletJSON {
@@ -206,394 +89,582 @@ type WalletJSON {
 	UUID    string `json:"uuid"`
 }
 
+
 var w walletJSON
-var g Round
-var c bool
-var Guid string
+var Man map[string]Bet
+var Game Round
 
-func main() {
+var UpdateUser Round
+var Arr []string
+var f Player
+var d Round
 
-	//for dom
-	var f interface{}
+var Playing []string
+var GState GameState
+var point int
+var t int
 	var leftDice int
 	var rightDice int
+	var finishL int
+	var finishR int
+var shooter string
+var Clients map[int]string
+var N int
 
-	T := js.Global
-	dice_arr := [6]string{"./res/dice1.png", "./res/dice2.png", "./res/dice3.png", "./res/dice4.png", "./res/dice5.png", "./res/dice6.png"}
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin:     func(r *http.Request) bool { return true },
+}
 
-	//for game
-	var t int
-	var point int
-	var wager int
-	var balance int
-	wager = 0
-	balance = 100
+func homePage(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Home Page")
+}
 
-	d := dom.GetWindow().Document()
-
-	//screens
-	ls := d.GetElementByID("login-screen").(*dom.HTMLDivElement)
-	gs := d.GetElementByID("gamble-screen").(*dom.HTMLDivElement)
-
-	//dice
-	l := d.GetElementByID("left-dice").(*dom.HTMLImageElement)
-	r := d.GetElementByID("right-dice").(*dom.HTMLImageElement)
-
-	//chips
-	oneDollar := d.GetElementByID("one-dollar").(*dom.HTMLButtonElement)
-	fiveDollar := d.GetElementByID("five-dollar").(*dom.HTMLButtonElement)
-	twentyFiveDollar := d.GetElementByID("twentyfive-dollar").(*dom.HTMLButtonElement)
-	oneHundo := d.GetElementByID("onehundred-dollar").(*dom.HTMLButtonElement)
-
-	//buttons
-	sg := d.GetElementByID("enter").(*dom.HTMLButtonElement)
-	b := d.GetElementByID("roll-button").(*dom.HTMLButtonElement)
-	w := d.GetElementByID("wager").(*dom.HTMLButtonElement)
-	p := d.GetElementByID("pass").(*dom.HTMLButtonElement)
-	dp := d.GetElementByID("dont-pass").(*dom.HTMLButtonElement)
-
-	
-	p.Disabled = true
-	dp.Disabled = true
-	w.Disabled = false
-
-	//textboxes
-	un := d.GetElementByID("username").(*dom.HTMLInputElement)
-	result := d.GetElementByID("result").(*dom.HTMLHeadingElement)
-	pb := d.GetElementByID("point-box").(*dom.HTMLHeadingElement)
-	wa := d.GetElementByID("wager-amount").(*dom.HTMLHeadingElement)
-	ba := d.GetElementByID("balance-amount").(*dom.HTMLHeadingElement)
-	pa := d.GetElementByID("pot-amount").(*dom.HTMLHeadingElement)
-	dr := d.GetElementByID("dice-roll").(*dom.HTMLHeadingElement)
-	//rb := d.GetElementByID("room").(*dom.HTMLInputElement)
-
-	//wallet textboxes 
-	
-	//sa := d.GetElementByID("sendAddress").(*dom.HTMLInputElement)
-	da := d.GetElementByID("depositAddress").(*dom.HTMLInputElement)
-	//wallet
-	mw := d.GetElementByID("myWallet").(*dom.HTMLDivElement)
-	
-	//wallet buttons
-	ow := d.GetElementByID("open-wallet").(*dom.HTMLButtonElement)
-	cw := d.GetElementByID("close-wallet").(*dom.HTMLSpanElement)
-	cp := d.GetElementByID("copy-address").(*dom.HTMLButtonElement)
-	wm := d.GetElementByID("withdraw-money").(*dom.HTMLButtonElement)
-
-	wa.Set("innerText", 0)
-
-	var state GameState
-	var play Bet
-    var hostName string
-
-	hostName = js.Global.Get("window").Get("location").Get("hostname").String()
-	
-	fmt.Print(hostName)
-	gs.Class().Add("invisible")
-
-	fmt.Println("Connection attempt ...")
-	
-	
-
-	ws, err := websocketjs.New("wss://"+"freshmintrecords.com"+":5000/ws") // Does not block.
-	if err != nil {
-		// handle error
-		fmt.Println(err)
-
-	}
-
-	//	m, err := websocketjs.New("ws://localhost:8080/v1/ws") // Does not block.
-
-	//m, err := websocketjs.New("ws://localhost:8080/v1/ws")
-
-	onOpen := func(ev *js.Object) {
-
-		fmt.Println("Connection success!!")
-
-	}
-	// ...
-
-	onMessage := func(ev *js.Object) {
-		js.Global.Get("document").Call("querySelector", "#room").Set("innerHTML", "")
-
-		Round := js.Global.Get("JSON").Call("parse", ev.Get("data"))
-		fmt.Print(ev.Get("data"), "ln 367")
-
-		diceL := Round.Get("gameData").Get("dice").Get("l").Int()
-		diceR := Round.Get("gameData").Get("dice").Get("r").Int()
-		num := Round.Get("gameData").Get("dice").Get("total").Int()
-		shooter := Round.Get("gameData").Get("shooter").String()
-
-		result.Set("innerText", Round.Get("jumbotron").String())
+func RemoveIndex(s []string, index int) []string {
+	copy(s[index:], s[index+1:]) // Shift a[i+1:] left one index.
+	s[len(s)-1] = ""             // Erase last element (write zero value).
+	s = s[:len(s)-1]             // Truncate slice.
+	return s
+}
 
 
-		l.Set("src", dice_arr[diceL])
-		r.Set("src", dice_arr[diceR])
 
-		
+func reader(conn *websocket.Conn) {
 
-		dr.Set("innerText", num)
+	var ok bool
 
 
-		usr := Round.Get("users")
-		roller := Round.Get("gameData").Get("roll")
-		//jsonState := Round.Get("state").String()
-		wager := Round.Get("gameData").Get("wager").String()
-		jsonPoint := Round.Get("gameData").Get("point").String()
-		balanceAmount := Round.Get("gameData").Get("balance").String()
-		potAmount := Round.Get("gameData").Get("pot").String()
-
-
-		
-
-
-		
-
-		if wager != "undefined" {
-		wa.Set("innerText",wager)
-	}
-
-		if potAmount == "undefined"{
-			pa.Set("innerText", "$0")
-		} else {
-			pa.Set("innerText", "$" + potAmount)
-		}
-		
-
-		if balanceAmount == "undefined" {
-			ba.Set("innerText", "$0")
-		} else {
-			ba.Set("innerText","Balance: $" + balanceAmount)
-		}
-		if jsonPoint != "undefined" {
-			pb.Set("innerText", jsonPoint)
-		}
-		
-		if state == WAGER || roller.String() != "true" {
-			w.Disabled = true
-			b.Disabled = true
-		}
-
-		if Round.Get("gameData").Get("placeBet").String() == "true" {
-			w.Disabled = false
-		}
-
-		if roller.String() == "true" && state == COMEOUT {
-			b.Disabled = false
-		}
-		count := 0
-
-		if usr.String() != "undefined" {
-		var splits = strings.Split(usr.String(), ",")
-
-		for _, element := range splits {
-			if element != "" {
-				li := js.Global.Get("document").Call("createElement", "li")
-				span := js.Global.Get("document").Call("createElement", "span")
-				if shooter == element {
-					span.Get("classList").Call("add", "glyph-magic")
+	//Read message
+	for {
+		_, p, err := conn.ReadMessage()
+		if err != nil {
+			for idx, element := range Man {
+				if element.Id == conn {
+					for i := 0; i < len(Arr); i++ {
+						if Arr[i] == element.Name {
+							Arr = RemoveIndex(Arr, i)
+						}
+					}
+					for y := 0; y < len(Game.Users); y++ {
+						if Game.Users[y] == element.Name {
+							Game.Users = RemoveIndex(Game.Users, y)
+							d.Users = RemoveIndex(d.Users, y)
+						}
+					}
+					for z := 0; z < len(Playing); z++ {
+						if Playing[z] == element.Name {
+							Playing = RemoveIndex(Playing, z)
+						}
+					}
+					for _, element := range Man {
+						element.Id.WriteJSON(Game)
+					}
+					_, ok := Man[idx]
+					if ok {
+						fmt.Println(Man)
+						delete(Man, idx)
+						fmt.Println(Man)
+					}
+					for idx, e := range Clients {
+						if Man[Clients[idx]].Name == Man[e].Name {
+							fmt.Println(Clients)
+							delete(Clients, idx)
+							fmt.Println(Clients)
+							N = N - 1
+						}
+					}
 				}
-				count = count + 1
-				text := js.Global.Get("document").Call("createTextNode", element)
-				li.Call("appendChild", text)
-				li.Call("appendChild", span)
-				js.Global.Get("document").Call("querySelector", "#room").Call("appendChild", li)
+			}
+			conn.Close()
+			return
+		}
+		//unmarshal json
+		if err := json.Unmarshal([]byte(p), &d); err != nil {
+			panic(err)
+		}
+        leftDice = 0
+	    rightDice = 0
+	    t = 0
+
+
+		if(d.Message == "rolling") {
+
+			if d.GameData.Dice.L > 0 && d.GameData.Dice.R > 0 {
+
+			leftDice = d.GameData.Dice.L
+			rightDice = d.GameData.Dice.R
+			Game.GameData.Dice.L = leftDice
+			Game.GameData.Dice.R = rightDice
+		    }
+
+			for _, element := range Man {
+				if element.Name != Arr[0] {
+				element.Id.WriteJSON(Game)
+			}
 			}
 		}
-	}
 
-	}
-
-	onClose := func(ev *js.Object) {
-		fmt.Sprintf("%b", ev)
-		ws.Object.Call("close") // Send a text frame.
-		// ...
-		fmt.Println("Connection closed")
-	}
-
-	onError := func(ev *js.Object) {
-		fmt.Println("Error", ev.Get("code").Int())
-		// ...
-	}
-	//m.AddEventListener("open", false, loadRound)
-	//m.AddEventListener("message", false, fetchUsers)
-	ws.AddEventListener("open", false, onOpen)
-
-	ws.AddEventListener("close", false, onClose)
-	ws.AddEventListener("error", false, onError)
-
-	ws.AddEventListener("message", false, onMessage)
-
-	//login
-	sg.AddEventListener("click", false, func(event dom.Event) {
-		b := make([]byte, 16)
-
-		_, err := rand.Read(b)
-		if err != nil {
-			log.Fatal(err)
+		Game.GameData.PlaceBet = false
+		if Game.GameData.Pot > 0 {
+			d.GameData.Pot = Game.GameData.Pot
 		}
-		uuid := fmt.Sprintf("%x-%x-%x-%x-%x",
-			b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 
-		Guid = uuid
 
-		if un.Value != "" {
-			gs.Class().Toggle("invisible")
-			ls.Class().Add("invisible")
-fmt.Println("sg")
-			a := &Round{Users: []string{}, GameData: Players{Players: []Player{Player{Username: "", Bet: ""}}}, UUID: Guid, Message: string(un.Value)}
-			e, err := json.Marshal(a)
-			if err != nil {
+
+		//add or update player
+		_, ok = Man[d.UUID]
+		if !ok {
+
+			var data FmTao
+			nodeAddr := taonode.GetAddress()
+
+			res := taonode.Balance(nodeAddr)
+
+			if err := json.Unmarshal([]byte(res), &data); err != nil {
 				fmt.Println(err)
 				return
 			}
 
-			ws.Object.Call("send", e)
+			bal, err := strconv.Atoi(data.Result)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			Man[d.UUID] = Bet{Name: d.Message, Id: conn, Address: nodeAddr, Balance: bal, }
+			fmt.Println(Man[d.UUID])
+
+
+			//User entered chatroom
+
+			Arr = append(Arr, d.Message)
+			Game.Users = Arr
+		    d.Users = Game.Users
+			Clients[N] = d.UUID
+			N++
+			rows := len(Game.Users)
+
+			shooter = Clients[0]
+			Game.GameData.Shooter = Man[Clients[0]].Name
+			d.GameData.Shooter = Man[Clients[0]].Name
+
+			if rows < 2 {
+				for _, element := range Arr {
+					// element is the element froM someSlice for where we are
+
+
+					player := Player{Username: element}
+					Game.GameData.Players = append(Game.GameData.Players, player)
+				}
+
+			}
+
+
+
+		} else if ok {
+
+			//count bets
+			if d.Message == "PASS" && d.State == WAGER || d.Message == "DONTPASS" && d.State == WAGER {
+
+				d.Jumbotron = "Wait for others to match..."
+
+
+				Man, Playing, d = placeBet(Man, Playing, d)
+				Game.GameData.PlaceBet = true
+				d.GameData.PlaceBet = false
+
+
+				if len(Playing) == len(Arr) {
+
+
+					ready := countBets(Man)
+					if ready {
+						d.GameData.Roll = true
+						d.GameData.PlaceBet = false
+						d.Jumbotron = "Roll when ready"
+						Game.Jumbotron = "Bet Placed"
+						Game.State = COMEOUT
+						d.State = COMEOUT
+					}
+				} else if d.UUID != shooter {
+					matched := matchedBet(Man)
+
+					if matched {
+						UpdateUser.Users = Game.Users
+						UpdateUser.GameData.PlaceBet = false
+						UpdateUser.Jumbotron = "Wait for others to match..."
+						UpdateUser.State = COMEOUT
+						Man[d.UUID].Id.WriteJSON(UpdateUser)
+						continue
+					} else if d.Wager != Man[shooter].Wager {
+						UpdateUser.Users = Game.Users
+						UpdateUser.GameData.PlaceBet = true
+						UpdateUser.Wager = 0
+						UpdateUser.Jumbotron = "match rollers amount:" + strconv.Itoa(Man[shooter].Wager)
+						UpdateUser.State = COMEOUT
+						Man[d.UUID].Id.WriteJSON(UpdateUser)
+						continue
+					}
+				}
+			}
+		}
+
+
+
+
+		//fnishd the dice
+		if d.Message == "finished" {
+			finishL = d.GameData.Dice.L
+			finishR = d.GameData.Dice.R
+			Game.GameData.Dice.L = finishL
+			Game.GameData.Dice.R = finishR
+			t = finishL + finishR + 2
+			Game.GameData.Dice.Total = t
+			d.GameData.Dice.Total = t
+		}
+
+		if d.Message == "finished" && d.State == COMEOUT {
+
+			point = t
+			Game.GameData.Point = point
+		}
+
+
+
+
+		//check state and update players
+
+		GState = d.State
+		Game.UUID = ""
+
+
+
+
+		if d.Message == "finished" {
+			if t == point && GState == ON {
+				Game.Jumbotron = "Pass bet wins!"
+				d.Jumbotron = "Pass bet wins!"
+
+
+				GState = PASSWIN
+				Game.State = GState
+				d.State = GState
+				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
+
+			}
+			if t == 7 && GState == ON {
+				Game.Jumbotron = "Don't pass bet wins!"
+				d.Jumbotron = "Don't pass bet wins!"
+
+
+				GState = PASSLOSE
+				Game.State = GState
+				d.State = GState
+				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
+
+
+			}
+			if GState == ON && t != point && GState== ON && t != 7 {
+				Game.Jumbotron = "Point on!"
+				d.Jumbotron = "Point on!"
+				d.GameData.Roll = true
+
+			}
+			if GState == PASSWIN || GState == PASSLOSE || GState == CRAPS {
+
+			}
+
+
+
+
+
+			if t > 3 && t < 11 && t != 7 && GState == COMEOUT {
+
+				Game.Jumbotron = "Point on"
+				d.Jumbotron = "Point on"
+
+				GState = ON
+				Game.State = GState
+				d.State = ON
+
+			}
+			if t == 7 && GState == COMEOUT || GState == COMEOUT && t == 11 {
+				Game.Jumbotron = "Pass bet wins!"
+				d.Jumbotron = "Pass bet wins!"
+
+
+				GState = PASSWIN
+				Game.State = GState
+				d.State = GState
+				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
+
+			}
+			if t == 2 && GState == COMEOUT || GState == COMEOUT && t == 3 || GState == COMEOUT && t == 12 {
+
+				Game.Jumbotron = "CRAPS"
+				d.Jumbotron = "CRAPS"
+
+
+
+
+				GState = CRAPS
+				Game.State = GState
+
+				d.GameData.PlaceBet = true
+				d.State = GState
+				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
+				fmt.Println("Shhoootterrr:", shooter)
+			}
+
+
+
+		switch Game.State {
+		case WAGER:
+
+
+		case COMEOUT:
+			Game.Jumbotron = "Comeout roll"
+
+		case CRAPS:
+
+			d.State = CRAPS
+			d.GameData.Roll = false
+
+		case ON:
+
+
+		case PASSWIN:
+
+			d.GameData.Roll = false
+
+		case PASSLOSE:
+
+			d.GameData.Roll = false
 
 		}
-	})
 
-	// BEGIN
+}
+if d.GameData.Pot == 0 && d.State == WAGER {
 
-	rand.Seed(time.Now().UnixNano())
+	d.Jumbotron = "Place bet..."
+d.GameData.PlaceBet = true
+Game.Jumbotron = "Wait for Roller to wager.."
+			Game.GameData.Roll = false
+			d.GameData.Roll = false
+}
 
-	state = WAGER
+if d.GameData.Pot > 0 && GState == WAGER {
 
-	w.AddEventListener("click", false, func(event dom.Event) {
-		state = loadWager(result, w, p, dp, oneDollar, fiveDollar, twentyFiveDollar, oneHundo, state)
-	})
+	Game.GameData.PlaceBet = true
+	Game.Jumbotron = "Place bet..."
+}
 
-	p.AddEventListener("click", false, func(event dom.Event) {
 
-		amount, err := strconv.Atoi(wa.Get("innerText").String())
-		if err != nil {
-			fmt.Println("err")
+d.GameData.Point = point
+
+
+
+
+if GState == CRAPS || GState == PASSWIN || GState == PASSLOSE {
+	d.GameData.PlaceBet = true
+	d.Wager = 0
+	Game.Wager = 0
+	Playing = []string{}
+	GState = WAGER
+	d.State = WAGER
+	Game.State = WAGER
+	Game.GameData.Shooter = Man[shooter].Name
+	d.GameData.Shooter = Man[shooter].Name
+
+}
+
+
+
+
+		for index, element := range Man {
+			if index != Clients[0] {
+				Game.GameData.Balance = Man[index].Balance
+				element.Id.WriteJSON(Game)
+				continue
+			} else if index == Clients[0] {
+				d.GameData.Balance = Man[index].Balance
+				element.Id.WriteJSON(d)
+			}
 		}
-		a := &Round{Users: []string{}, GameData: Players{Players: []Player{Player{}}}, Wager: amount, UUID: Guid, Message: "PASS"}
-		e, err := json.Marshal(a)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		fmt.Println("p")
-		ws.Object.Call("send", e)
-		play = playPass(play, state, wager, b, oneDollar, fiveDollar, twentyFiveDollar, oneHundo, result, p, dp)
-	})
+	}
+}
 
-	dp.AddEventListener("click", false, func(event dom.Event) {
-		amount, err := strconv.Atoi(wa.Get("innerText").String())
-		if err != nil {
-			fmt.Println("err")
-		}
-		a := &Round{Users: []string{}, GameData: Players{Players: []Player{Player{}}}, Wager: amount, UUID: Guid, Message: "DONTPASS"}
-		e, err := json.Marshal(a)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		fmt.Println("dp")
-		ws.Object.Call("send", e)
-		play = playDontPass(play, state, wager, b, oneDollar, fiveDollar, twentyFiveDollar, oneHundo, result, p, dp)
-	})
+func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+	}
+
+	//log.Println("Client Successfully Connected...")
+
+	reader(ws)
+
+}
+
+
+
+func payout(M map[string]Bet, Game Round, d Round, finishState GameState, Clients map[int]string, shooter string) (map[string]Bet, Round, Round, map[int]string, string) {
+
+	var i int
+	var y int
+	var name string
+	var lastName string
+
+
+	for _, v := range M {
+		if v.Bet == "PASS" && finishState == PASSWIN || v.Bet == "DONTPASS" && finishState == PASSLOSE || v.Bet == "DONTPASS" && finishState == CRAPS {
+				i++
+			}
+	}
+
+	for index, v := range M {
+
+			if v.Bet == "PASS" && finishState == PASSWIN || v.Bet == "DONTPASS" && finishState == PASSLOSE || v.Bet == "DONTPASS" && finishState == CRAPS {
+
+				v.Balance += Game.GameData.Pot / i
+				Man[index] = v
+				if index == shooter {
+					y++
+				}
+			}
+
+
+	}
+	if y == 0 {
+
+		name = Clients[0]
+		lastName = Clients[len(Clients) - 1]
+
+		Clients[0] = lastName
+        Clients[len(Clients) - 1] = name
+        shooter = Clients[0]
+	}
+	Game.GameData.Pot = 0
+	d.GameData.Pot = 0
+
+	return M, Game, d, Clients, shooter
+}
+
+func matchedBet(M map[string]Bet) bool {
 	i := 0
-
-	oneDollar.Disabled = true
-	fiveDollar.Disabled = true
-	twentyFiveDollar.Disabled = true
-	oneHundo.Disabled = true
-
-	pb.Set("innerText", "")
-
-	//wallet
-	ow.AddEventListener("click", false, func(event dom.Event) {
-		mw.Style().SetProperty("display","block","")
-	})
-
-	cw.AddEventListener("click", false, func(event dom.Event) {
-		mw.Style().SetProperty("display","none","")
-	})
-
-	cp.AddEventListener("click", false, func(event dom.Event) {
-		js.Global.Call("alert", da.Value)
-	})
-
-	wm.AddEventListener("click", false, func(event dom.Event) {
-		js.Global.Call("alert", da.Value)
-	})
-    
-
-	//gamble
-
-	oneDollar.AddEventListener("click", false, func(event dom.Event) {
-		balance, wager = addOneDollar(balance, wager, p, dp, wa, ba)
-	})
-
-	fiveDollar.AddEventListener("click", false, func(event dom.Event) {
-		balance, wager = addFiveDollars(balance, wager, p, dp, wa, ba)
-	})
-
-	twentyFiveDollar.AddEventListener("click", false, func(event dom.Event) {
-		balance, wager = addTwentyFiveDollars(balance, wager, p, dp, wa, ba)
-	})
-
-	oneHundo.AddEventListener("click", false, func(event dom.Event) {
-		balance, wager = addOneHundo(balance, wager, p, dp, wa, ba)
-	})
+	t := 0
 
 
+	for index, v := range M {
 
-	b.AddEventListener("click", false, func(event dom.Event) {
 
-		f = T.Call("setInterval", func() {
-			leftDice = rand.Intn(6)
-			rightDice = rand.Intn(6)
-			b.Disabled = true
-			//fmt.Println(i)
-			t = leftDice + rightDice + 2
-		fmt.Println("rolltotal",t)		
-			
+		if(M[index] != M[shooter]) {
+		if v.Wager == M[shooter].Wager {
+			t++
+		}
+	}
+	}
+	i++
+	if t == 1 {
+		return true
+	}
+	return false
+}
 
-			i = roll(i, f)
+func countBets(M map[string]Bet) bool {
+	i := 0
+	t := 0
+	var id string
 
+	for index, v := range M {
+		if i == 0 {
+			id = index
+		}
+		if v.Wager == M[id].Wager {
+			t++
+
+		}
+		i++
+	}
+
+	if len(M) > 1 && t == len(M) {
+		return true
+	} else {
+		return false
+	}
+}
+
+func placeBet(M map[string]Bet, U []string, d Round) (map[string]Bet, []string, Round) {
+
+	for index, v := range M {
+
+		if index == d.UUID {
+
+			if d.Wager != M[shooter].Wager && index != shooter {
+				return M, U, d
+			}
+			v.Wager = d.Wager
+			v.Bet = d.Message
+			Game.GameData.Pot = Game.GameData.Pot + d.Wager
+			d.GameData.Pot = Game.GameData.Pot
+		    v.Balance = v.Balance - d.Wager
+			M[d.UUID] = v
+			U = append(U, d.UUID)
+		}
+
+	}
 	
-if i == 5 {
-			
-			l.Set("src", dice_arr[leftDice])
-			r.Set("src", dice_arr[rightDice])
-fmt.Println("finishDice",leftDice,rightDice)
-fmt.Println("5total",t)		
-fmt.Println("5point",point)
-					a := &Round{Users: []string{}, GameData: Players{Dice: Dice{L: leftDice, R: rightDice}}, UUID: Guid, Message: "finished"}
-					e, err := json.Marshal(a)
-					fmt.Println(a)
-					if err != nil {
-						fmt.Println(err)
-						
-					}
+	return M, U, d
+}
 
-					ws.Object.Call("send", e)
-					i = 0
-				}
-				
-				
-				if i < 5 && i != 0 {
-					fmt.Println("rollingDice",leftDice,rightDice)
-					a := &Round{Users: []string{}, GameData: Players{Dice: Dice{L: leftDice, R: rightDice}}, UUID: Guid, Message: "rolling"}
-					
-					e, err := json.Marshal(a)
-					if err != nil {
-						fmt.Println(err)
-						
-					}
-					ws.Object.Call("send", e)
-				}
+func walletEndpoint(w http.ResponseWriter, r *http.Request){
 
-				
-			i++	
-
-		}, 65)
+	var conn, _ = upgrader.Upgrade(w, r, nil)
+	go func(conn *websocket.Conn) {
+		for {
+	mType, msg, _ := conn.ReadMessage()
+	fmt.Println(mType)
+/*
+	if err := json.Unmarshal([]byte(mType), &w); err != nil {
+		panic(err)
+	}
+*/
 
 
-	})
+
+
+
+
+
+	conn.WriteMessage(mType, msg)
+}
+}(conn)
+
+}
+
+func setupRoutes() {
+	http.HandleFunc("/", homePage)
+	http.HandleFunc("/ws", wsEndpoint)
+	http.HandleFunc("/v1/wallet", walletEndpoint)
+    fmt.Println("Go Websockets!")
+}
+
+//redirect all HTTP traffic to HTTPS server on port :443
+func redirectTLS(w http.ResponseWriter, r *http.Request)  {
+
+	http.Redirect(w,r,"https://freshmintrecords.com:5005"+r.RequestURI,http.StatusMovedPermanently)
+}
+
+func main() {
+
+	Man = make(map[string]Bet)
+	Clients = make(map[int]string)
+	setupRoutes()
+
+    err := http.ListenAndServeTLS(":5000","./freshmintrecords_com.crt","./freshmintrecords.key",nil)
+    if err != nil {
+    	log.Fatal("ListenAndServe:", err)
+    }
+	//log.Fatal(http.ListenAndServe(":5000", nil))
 }
