@@ -76,6 +76,10 @@ type TaoExplorer struct {
 	lastTxs  []LastTx `json:"last_txs"`
 }
 
+type FmTao struct {
+	Result      string `json:"result"`
+}
+
 
 
 type WalletJSON struct {

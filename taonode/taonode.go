@@ -61,7 +61,7 @@ func GetNewAddress() string {
     }
 
 
-    return string(body.Result)
+    return string(body)
 
 }
 
