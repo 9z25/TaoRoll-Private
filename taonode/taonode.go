@@ -21,6 +21,14 @@ type FmTao struct {
 	Result      string `json:"result"`
 }
 
+type TaoExplorer struct {
+	Address  string   `json:"address"`
+	Sent     int      `json:"sent"`
+	Received string   `json:"received"`
+	Balance  string   `json:"balance"`
+	lastTxs  []LastTx `json:"last_txs"`
+}
+
 var client = & http.Client {}
 
 // GetAddress : for Testing purposes ex. addr, _ := taonode.GetAddress()
@@ -112,13 +120,13 @@ func Balance(addr string) string {
 
     fmt.Println("test")
     fmt.Println(string(body))
-    var fmNode FmTao
+    var fmNode TaoExplorer
     json.Unmarshal(body, &fmNode)
 
-    fmt.Println(fmNode.Result)
+    fmt.Println(fmNode.Balance)
 
 
-    return string(fmNode.Result)
+    return string(fmNode.Balance)
 }
 
 
