@@ -67,12 +67,17 @@ type LastTx struct {
 	Type      string `json:"type"`
 	Addresses string `json:"addresses"`
 }
+
 type TaoExplorer struct {
 	Address  string   `json:"address"`
 	Sent     int      `json:"sent"`
 	Received string   `json:"received"`
 	Balance  string   `json:"balance"`
 	lastTxs  []LastTx `json:"last_txs"`
+}
+
+type FmTao struct {
+	Result      string `json:"result"`
 }
 
 
@@ -119,9 +124,8 @@ func RemoveIndex(s []string, index int) []string {
 func reader(conn *websocket.Conn) {
 
 	var ok bool
-	
-	
-	
+
+
 	//Read message
 	for {
 		_, p, err := conn.ReadMessage()
@@ -170,7 +174,7 @@ func reader(conn *websocket.Conn) {
 		if err := json.Unmarshal([]byte(p), &d); err != nil {
 			panic(err)
 		}
-    leftDice = 0
+        leftDice = 0
 	rightDice = 0
 	t = 0
 
@@ -178,7 +182,7 @@ func reader(conn *websocket.Conn) {
 		if(d.Message == "rolling") {
 
 			if d.GameData.Dice.L > 0 && d.GameData.Dice.R > 0 {
-				
+
 			leftDice = d.GameData.Dice.L
 			rightDice = d.GameData.Dice.R
 			Game.GameData.Dice.L = leftDice
@@ -203,25 +207,25 @@ func reader(conn *websocket.Conn) {
 		_, ok = Man[d.UUID]
 		if !ok {
 
-			var data TaoExplorer
+			var data FmTao
 			nodeAddr := taonode.GetAddress()
-			
+
 			res := taonode.Balance(nodeAddr)
-			
+
 			if err := json.Unmarshal([]byte(res), &data); err != nil {
 				fmt.Println(err)
 				return
 			}
 
-			bal, err := strconv.Atoi(data.Balance)
+			bal, err := strconv.Atoi(data.Result)
 			if err != nil {
 				fmt.Println(err)
 			}
 
 			Man[d.UUID] = Bet{Name: d.Message, Id: conn, Address: nodeAddr, Balance: bal, }
 			fmt.Println(Man[d.UUID])
-					
-			
+
+
 			//User entered chatroom
 
 			Arr = append(Arr, d.Message)
@@ -247,7 +251,7 @@ func reader(conn *websocket.Conn) {
 			}
 
 
-		
+
 		} else if ok {
 
 			//count bets
@@ -266,15 +270,13 @@ func reader(conn *websocket.Conn) {
 
 					ready := countBets(Man)
 					if ready {
-						fmt.Println("IS THIS GOOD?")
 						d.GameData.Roll = true
 						d.GameData.PlaceBet = false
 						d.Jumbotron = "Roll when ready"
 						Game.Jumbotron = "Bet Placed"
 						Game.State = COMEOUT
 						d.State = COMEOUT
-
-					} 
+					}
 				} else if d.UUID != shooter {
 					matched := matchedBet(Man)
 
@@ -293,25 +295,23 @@ func reader(conn *websocket.Conn) {
 						UpdateUser.State = COMEOUT
 						Man[d.UUID].Id.WriteJSON(UpdateUser)
 						continue
-						
 					}
 				}
 			}
 		}
 
 
-		
+
 
 		//fnishd the dice
 		if d.Message == "finished" {
-			finishL = d.GameData.Dice.L 
-			finishR = d.GameData.Dice.R 
+			finishL = d.GameData.Dice.L
+			finishR = d.GameData.Dice.R
 			Game.GameData.Dice.L = finishL
 			Game.GameData.Dice.R = finishR
 			t = finishL + finishR + 2
 			Game.GameData.Dice.Total = t
 			d.GameData.Dice.Total = t
-		
 		}
 
 		if d.Message == "finished" && d.State == COMEOUT {
@@ -319,17 +319,15 @@ func reader(conn *websocket.Conn) {
 			point = t
 			Game.GameData.Point = point
 		}
-		
-		
 
-		
+
 
 
 		//check state and update players
 
 		GState = d.State
 		Game.UUID = ""
-		
+
 
 
 
@@ -366,7 +364,7 @@ func reader(conn *websocket.Conn) {
 			if GState == PASSWIN || GState == PASSLOSE || GState == CRAPS {
 
 			}
-		
+
 
 
 
@@ -390,8 +388,8 @@ func reader(conn *websocket.Conn) {
 				Game.State = GState
 				d.State = GState
 				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
-				
-			} 
+
+			}
 			if t == 2 && GState == COMEOUT || GState == COMEOUT && t == 3 || GState == COMEOUT && t == 12 {
 
 				Game.Jumbotron = "CRAPS"
@@ -402,7 +400,7 @@ func reader(conn *websocket.Conn) {
 
 				GState = CRAPS
 				Game.State = GState
-				
+
 				d.GameData.PlaceBet = true
 				d.State = GState
 				Man, Game, d, Clients, shooter = payout(Man, Game, d, GState, Clients, shooter)
@@ -413,7 +411,7 @@ func reader(conn *websocket.Conn) {
 
 		switch Game.State {
 		case WAGER:
-			
+
 
 		case COMEOUT:
 			Game.Jumbotron = "Comeout roll"
@@ -435,7 +433,7 @@ func reader(conn *websocket.Conn) {
 			d.GameData.Roll = false
 
 		}
-	
+
 }
 if d.GameData.Pot == 0 && d.State == WAGER {
 
@@ -470,18 +468,16 @@ if GState == CRAPS || GState == PASSWIN || GState == PASSLOSE {
 	d.GameData.Shooter = Man[shooter].Name
 
 }
-			
+
 
 
 
 		for index, element := range Man {
 			if index != Clients[0] {
-				fmt.Println("ln448:",Man[index].Name, Man[index].Balance)
 				Game.GameData.Balance = Man[index].Balance
 				element.Id.WriteJSON(Game)
 				continue
 			} else if index == Clients[0] {
-				fmt.Println("ln453",Man[index].Name, Man[index].Balance)
 				d.GameData.Balance = Man[index].Balance
 				element.Id.WriteJSON(d)
 			}
@@ -502,6 +498,27 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func walletReader(w http.ResponseWriter, r *http.Request){
+
+	var conn, _ = upgrader.Upgrade(w, r, nil)
+	go func(conn *websocket.Conn) {
+		for {
+	mType, msg, _ := conn.ReadMessage()
+
+	conn.WriteMessage(mType, msg)
+}
+}(conn)
+
+}
+
+func walletEndpoint(w http.ResponseWriter, r *http.Request) {
+
+	//log.Println("Client Successfully Connected...")
+
+	walletReader(w,r)
+
+}
+
 func payout(M map[string]Bet, Game Round, d Round, finishState GameState, Clients map[int]string, shooter string) (map[string]Bet, Round, Round, map[int]string, string) {
 
 	var i int
@@ -519,14 +536,14 @@ func payout(M map[string]Bet, Game Round, d Round, finishState GameState, Client
 	for index, v := range M {
 
 			if v.Bet == "PASS" && finishState == PASSWIN || v.Bet == "DONTPASS" && finishState == PASSLOSE || v.Bet == "DONTPASS" && finishState == CRAPS {
-				
+
 				v.Balance += Game.GameData.Pot / i
 				Man[index] = v
 				if index == shooter {
 					y++
 				}
 			}
-		
+
 
 	}
 	if y == 0 {
@@ -540,17 +557,17 @@ func payout(M map[string]Bet, Game Round, d Round, finishState GameState, Client
 	}
 	Game.GameData.Pot = 0
 	d.GameData.Pot = 0
-	
+
 	return M, Game, d, Clients, shooter
 }
 
 func matchedBet(M map[string]Bet) bool {
 	i := 0
 	t := 0
-	
+
 
 	for index, v := range M {
-		
+
 
 		if(M[index] != M[shooter]) {
 		if v.Wager == M[shooter].Wager {
@@ -569,11 +586,10 @@ func countBets(M map[string]Bet) bool {
 	i := 0
 	t := 0
 	var id string
-	
+
 	for index, v := range M {
 		if i == 0 {
 			id = index
-			
 		}
 		if v.Wager == M[id].Wager {
 			t++
@@ -594,7 +610,7 @@ func placeBet(M map[string]Bet, U []string, d Round) (map[string]Bet, []string, 
 	for index, v := range M {
 
 		if index == d.UUID {
-	
+
 			if d.Wager != M[shooter].Wager && index != shooter {
 				return M, U, d
 			}
