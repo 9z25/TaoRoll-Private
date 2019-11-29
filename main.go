@@ -80,7 +80,7 @@ type FmTao struct {
 	Result      string `json:"result"`
 }
 
-type WalletJSON {
+type WalletJSON struct {
 	Action string `json:"action"`
 	Address string `json:"address"`
 	Withdraw string `json:"withdraw"`
