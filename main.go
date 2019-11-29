@@ -630,6 +630,32 @@ for {
 	}
 
 	fmt.Println(wallet)
+
+	var data FmTao
+	nodeAddr := taonode.GetAddress()
+
+	res := taonode.Balance(nodeAddr)
+
+	if err := json.Unmarshal([]byte(res), &data); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	/*
+	bal, err := strconv.Atoi(data.Result)
+	if err != nil {
+		fmt.Println(err)
+	}
+	*/
+
+	//Man[d.UUID] = Bet{Name: d.Message, Id: conn, Address: nodeAddr, Balance: bal, }
+	
+	wallet.Address = nodeAddr
+	wallet.Balance = "0.0"
+
+	fmt.Println(wallet)
+
+
 }
 
 
