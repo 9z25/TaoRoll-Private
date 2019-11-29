@@ -88,6 +88,7 @@ type WalletJSON struct {
 	Withdraw string `json:"withdraw"`
 	Recipient string `json:"recipient"`
 	Balance string `json:"balance"`
+	Reciept   string `json:"reciept"`
 	UUID    string `json:"uuid"`
 }
 
@@ -631,33 +632,33 @@ for {
 		panic(err)
 	}
 
-	fmt.Println(wallet)
-
-	var data FmTao
+	
+	if(wallet.Action == "viewWallet") {
+	
 	nodeAddr := taonode.GetAddress()
 
 	res := taonode.Balance(nodeAddr)
-
-	if err := json.Unmarshal([]byte(res), &data); err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	/*
-	bal, err := strconv.Atoi(data.Result)
-	if err != nil {
-		fmt.Println(err)
-	}
-	*/
-
-	//Man[d.UUID] = Bet{Name: d.Message, Id: conn, Address: nodeAddr, Balance: bal, }
 	
 	wallet.Address = nodeAddr
-	wallet.Balance = "0.0"
+	wallet.Balance = res
+	}
+	if(wallet.Action == "withdrawTao") {
+	
+	nodeAddr := wallet.Recipient
+	res := taonode.SendToAddress(nodeAddr)
+	wallet.Recipient = ""
+
+	wallet.Address = nodeAddr
+	wallet.Reciept = res
+	}
+	if(wallet.Action == "viewTransactions"){
+
+	}
 
 	fmt.Println(wallet)
 
 	conn.WriteJSON(wallet)
+	wallet.Reciept = ""
 
 
 }
