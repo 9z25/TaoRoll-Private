@@ -76,9 +76,7 @@ type TaoExplorer struct {
 	lastTxs  []LastTx `json:"last_txs"`
 }
 
-type FmTao struct {
-	Result      string `json:"result"`
-}
+
 
 type WalletJSON struct {
 	Action string `json:"action"`
@@ -654,6 +652,8 @@ for {
 	wallet.Balance = "0.0"
 
 	fmt.Println(wallet)
+
+	conn.WriteJSON(wallet)
 
 
 }

@@ -15,6 +15,10 @@ const url3 = "https://taoexplorer.com/ext/getaddress/"
 const url4 = "http://34.223.110.241:8000/api/getnewaddress/"
 const addy = "TfDJV4odVTsR8u7maQWg7yBTE4aghxwd4h"
 
+type FmTao struct {
+	Result      string `json:"result"`
+}
+
 var client = & http.Client {}
 
 // GetAddress : for Testing purposes ex. addr, _ := taonode.GetAddress()
@@ -31,8 +35,13 @@ func GetAddress() string {
         fmt.Println(err)
     }
 
+    var fmNode FmTao
+    json.Unmarshal(body, &fmNode)
 
-    return string(body)
+    fmt.Println(fmNode.Result)
+
+
+    return string(fmNode.Result)
 }
 
 
@@ -51,7 +60,7 @@ func GetNewAddress() string {
     }
 
 
-    return string(body)
+    return string(body.Result)
 
 }
 
