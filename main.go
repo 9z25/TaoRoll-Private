@@ -642,6 +642,15 @@ for {
 	wallet.Address = nodeAddr
 	wallet.Balance = res
 	}
+
+	if(wallet.Action == "getNewAddress"){
+	nodeAddr := taonode.GetAddress()
+
+	res := taonode.Balance(nodeAddr)
+	
+	wallet.Address = nodeAddr
+	wallet.Balance = res
+	}
 	if(wallet.Action == "withdrawTao") {
 	
 	nodeAddr := wallet.Recipient

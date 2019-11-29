@@ -83,6 +83,7 @@ func GetNewAddress() string {
 
 }
 
+// SendToAddress returns a tao transaction ex. tx, _ := taonode.SendToAddress()
 func SendToAddress(addr string) string {
     req, _ := http.NewRequest("GET", url5 + addr, nil)
 
