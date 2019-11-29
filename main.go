@@ -635,6 +635,7 @@ func placeBet(M map[string]Bet, U []string, d Round) (map[string]Bet, []string, 
 func setupRoutes() {
 	http.HandleFunc("/", homePage)
 	http.HandleFunc("/ws", wsEndpoint)
+	http.HandleFunc("/ws/wallet", walletEndpoint)
     fmt.Println("Go Websockets!")
 }
 
