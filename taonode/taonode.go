@@ -110,6 +110,8 @@ func Balance(addr string) string {
         fmt.Println(err)
     }
 
+    fmt.Println("test")
+    fmt.Println(string(body))
     var fmNode FmTao
     json.Unmarshal(body, &fmNode)
 
