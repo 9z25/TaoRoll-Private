@@ -90,7 +90,7 @@ type WalletJSON struct {
 }
 
 
-var w walletJSON
+var w WalletJSON
 var Man map[string]Bet
 var Game Round
 
