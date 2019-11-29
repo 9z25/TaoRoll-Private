@@ -21,6 +21,11 @@ type FmTao struct {
 	Result      string `json:"result"`
 }
 
+type LastTx struct {
+	Type      string `json:"type"`
+	Addresses string `json:"addresses"`
+}
+
 type TaoExplorer struct {
 	Address  string   `json:"address"`
 	Sent     int      `json:"sent"`
