@@ -623,11 +623,16 @@ func walletEndpoint(w http.ResponseWriter, r *http.Request){
 	var conn, _ = upgrader.Upgrade(w, r, nil)
 	go func(conn *websocket.Conn) {
 		for {
-	mType, msg, _ := conn.ReadMessage()
-	fmt.Println(mType)
-	fmt.Println(msg)
 
-	if err := json.Unmarshal([]byte(msg), &w); err != nil {
+			_, p, err := conn.ReadMessage()
+			if err != nil {
+				panic(err)
+			}
+			
+	mType, msg, _ := conn.ReadMessage()
+	
+
+	if err := json.Unmarshal([]byte(p), &w); err != nil {
 		panic(err)
 	}
 fmt.Println(w)
