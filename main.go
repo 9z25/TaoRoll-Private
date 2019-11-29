@@ -626,11 +626,11 @@ func walletEndpoint(w http.ResponseWriter, r *http.Request){
 	mType, msg, _ := conn.ReadMessage()
 	fmt.Println(mType)
 	fmt.Println(msg)
-/*
+
 	if err := json.Unmarshal([]byte(mType), &w); err != nil {
 		panic(err)
 	}
-*/
+fmt.Println(w)
 
 
 
