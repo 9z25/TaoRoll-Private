@@ -633,18 +633,19 @@ for {
 }
 
 
+}
 
-func walletEndpoint(w http.ResponseWriter, r *http.Request){
+func walletEndpoint(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+	}
 
-		ws, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println(err)
-		}
-	
-		//log.Println("Client Successfully Connected...")
-	
-		walletReader(ws)
-	
+	//log.Println("Client Successfully Connected...")
+
+	walletReader(ws)
+
+
 }
 
 func setupRoutes() {
