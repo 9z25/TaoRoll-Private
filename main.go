@@ -498,26 +498,7 @@ func wsEndpoint(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func walletReader(w http.ResponseWriter, r *http.Request){
 
-	var conn, _ = upgrader.Upgrade(w, r, nil)
-	go func(conn *websocket.Conn) {
-		for {
-	mType, msg, _ := conn.ReadMessage()
-
-	conn.WriteMessage(mType, msg)
-}
-}(conn)
-
-}
-
-func walletEndpoint(w http.ResponseWriter, r *http.Request) {
-
-	//log.Println("Client Successfully Connected...")
-
-	walletReader(w,r)
-
-}
 
 func payout(M map[string]Bet, Game Round, d Round, finishState GameState, Clients map[int]string, shooter string) (map[string]Bet, Round, Round, map[int]string, string) {
 
@@ -621,8 +602,6 @@ func placeBet(M map[string]Bet, U []string, d Round) (map[string]Bet, []string, 
 		    v.Balance = v.Balance - d.Wager
 			M[d.UUID] = v
 			U = append(U, d.UUID)
-
-			
 		}
 
 	}
@@ -630,12 +609,23 @@ func placeBet(M map[string]Bet, U []string, d Round) (map[string]Bet, []string, 
 	return M, U, d
 }
 
+func walletEndpoint(w http.ResponseWriter, r *http.Request){
 
+	var conn, _ = upgrader.Upgrade(w, r, nil)
+	go func(conn *websocket.Conn) {
+		for {
+	mType, msg, _ := conn.ReadMessage()
+
+	conn.WriteMessage(mType, msg)
+}
+}(conn)
+
+}
 
 func setupRoutes() {
 	http.HandleFunc("/", homePage)
 	http.HandleFunc("/ws", wsEndpoint)
-	http.HandleFunc("/ws/wallet", walletEndpoint)
+	http.HandleFunc("/v1/wallet", walletEndpoint)
     fmt.Println("Go Websockets!")
 }
 
