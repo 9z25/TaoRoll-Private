@@ -707,9 +707,9 @@ func main() {
 	Clients = make(map[int]string)
 	setupRoutes()
 
-    err := http.ListenAndServeTLS(":5000","./freshmintrecords_com.crt","./freshmintrecords.key",nil)
+    //err := http.ListenAndServeTLS(":5000","./freshmintrecords_com.crt","./freshmintrecords.key",nil)
     if err != nil {
     	log.Fatal("ListenAndServe:", err)
     }
-	//log.Fatal(http.ListenAndServe(":5000", nil))
+	log.Fatal(http.ListenAndServe(":5000", nil))
 }
